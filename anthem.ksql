@@ -1,0 +1,47 @@
+set 'auto.offset.reset' = 'earliest';
+
+create stream customers_s (cust_id string,first_name string, 
+                           last_name string,age int, gender string, state string) 
+  with (kafka_topic = 'customers', value_format = 'AVRO', key = 'cust_id');
+
+create stream claims_s (claim_id string,cust_id string, 
+                        procedure_id string,provider_id string, service_date double, amt double) 
+  with (kafka_topic = 'claims', value_format = 'AVRO');
+
+create stream providers_s (provider_id string, provider_name string, 
+                           provider_status string,address string, city string,
+                           state string) 
+  with (kafka_topic = 'providers', value_format = 'AVRO');
+
+create stream procedures_s (procedure_id string,procedure_name string, 
+                            fee_tolerance double, frequency_tolerance int) 
+  with (kafka_topic = 'procedures', value_format = 'AVRO', key = 'procedure_id');
+
+create table customers_t (cust_id string,first_name string,
+                          last_name string, age int, gender string, state string)
+  with (kafka_topic = 'customers', value_format = 'AVRO', key = 'cust_id');
+
+create table procedures_t (procedure_id string,procedure_name string, 
+                           fee_tolerance double, frequency_tolerance int) 
+  with (kafka_topic = 'procedures', value_format = 'AVRO', key = 'procedure_id');
+
+create table providers_t (provider_id string, provider_name string, 
+                           provider_status string,address string, city string,
+                           state string) 
+  with (kafka_topic = 'providers', value_format = 'AVRO', key = 'provider_id');
+
+create stream claims_out_of_tolerance as 
+  select cust_id,amt,procedure_name,fee_tolerance, provider_id
+    from claims_s c 
+      inner join procedures_t p on c.procedure_id = p.procedure_id 
+    where amt > fee_tolerance;
+
+create stream claims_out_of_tolerance_providers as 
+  select *
+    from claims_out_of_tolerance c 
+      inner join providers_t p on c.provider_id = p.provider_id;
+
+create stream claims_out_of_tolerance_customers as 
+  select *
+    from claims_out_of_tolerance_providers c 
+      inner join customers_t cs on c.c_cust_id = cs.cust_id;
